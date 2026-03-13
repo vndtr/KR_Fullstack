@@ -72,15 +72,15 @@ const swaggerOptions = {
       description: 'API для книг с аутентификацией через JWT',
     },
     servers: [{ url: `http://localhost:${PORT}` }],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
-        }
-      }
-    },
+components: {
+  securitySchemes: {
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+    }
+  }
+},
     security: [{
       bearerAuth: []
     }]

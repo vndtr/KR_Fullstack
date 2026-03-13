@@ -1,13 +1,12 @@
 
+
 const jwt = require("jsonwebtoken");
 
-// Секретный ключ для подписи токенов 
-const JWT_SECRET = "bookstore_secret_key_2026";
+const ACCESS_SECRET = "bookstore_access_secret_2026";
 
 function authMiddleware(req, res, next) {
   const header = req.headers.authorization || "";
 
-  // Ожидаем формат: Bearer <token>
   const [scheme, token] = header.split(" ");
 
   if (scheme !== "Bearer" || !token) {
@@ -17,12 +16,8 @@ function authMiddleware(req, res, next) {
   }
 
   try {
-    // Проверяем токен
-    const payload = jwt.verify(token, JWT_SECRET);
-    
-    // Сохраняем данные пользователя в запрос
-    req.user = payload; // { sub, email, firstName, lastName, iat, exp }
-    
+    const payload = jwt.verify(token, ACCESS_SECRET);
+    req.user = payload;
     next();
   } catch (err) {
     return res.status(401).json({ 

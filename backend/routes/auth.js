@@ -7,13 +7,42 @@ const jwt = require("jsonwebtoken");
 
 let users = require("../data/users");
 
-// Секретный ключ (должен совпадать с тем, что в middleware)
-const JWT_SECRET = "bookstore_secret_key_2026";
-const ACCESS_EXPIRES_IN = "15m"; // токен живет 15 минут
+// Секретные ключи (в реальном проекте хранят в .env)
+const ACCESS_SECRET = "bookstore_access_secret_2026";
+const REFRESH_SECRET = "bookstore_refresh_secret_2026";
+
+// Время жизни токенов
+const ACCESS_EXPIRES_IN = "15m";  // 15 минут
+const REFRESH_EXPIRES_IN = "7d";   // 7 дней
+
+// Хранилище активных refresh-токенов (в памяти)
+let refreshTokens = new Set();
 
 // Вспомогательная функция для поиска пользователя по email
 function findUserByEmail(email) {
   return users.find(u => u.email === email);
+}
+
+// Функции для генерации токенов
+function generateAccessToken(user) {
+  return jwt.sign(
+    { 
+      sub: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName
+    },
+    ACCESS_SECRET,
+    { expiresIn: ACCESS_EXPIRES_IN }
+  );
+}
+
+function generateRefreshToken(user) {
+  return jwt.sign(
+    { sub: user.id },
+    REFRESH_SECRET,
+    { expiresIn: REFRESH_EXPIRES_IN }
+  );
 }
 
 /**
@@ -43,6 +72,8 @@ function findUserByEmail(email) {
  *       properties:
  *         accessToken:
  *           type: string
+ *         refreshToken:
+ *           type: string
  *         user:
  *           type: object
  *           properties:
@@ -54,6 +85,13 @@ function findUserByEmail(email) {
  *               type: string
  *             lastName:
  *               type: string
+ *     RefreshResponse:
+ *       type: object
+ *       properties:
+ *         accessToken:
+ *           type: string
+ *         refreshToken:
+ *           type: string
  */
 
 /**
@@ -79,7 +117,7 @@ function findUserByEmail(email) {
  *                 example: @mail.ru
  *               firstName:
  *                 type: string
- *                 example: Анна
+ *                 example: string
  *               lastName:
  *                 type: string
  *                 example: string
@@ -128,7 +166,7 @@ router.post("/register", async (req, res) => {
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Вход в систему, получение JWT-токена
+ *     summary: Вход в систему, получение access и refresh токенов
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -148,7 +186,7 @@ router.post("/register", async (req, res) => {
  *                 example: string
  *     responses:
  *       200:
- *         description: Успешный вход, возвращает токен
+ *         description: Успешный вход
  *         content:
  *           application/json:
  *             schema:
@@ -177,23 +215,18 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Неверный пароль" });
     }
 
-    // Создаем JWT-токен
-    const accessToken = jwt.sign(
-      { 
-        sub: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName
-      },
-      JWT_SECRET,
-      { expiresIn: ACCESS_EXPIRES_IN }
-    );
+    // Генерируем токены
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    
+    // Сохраняем refresh-токен в хранилище
+    refreshTokens.add(refreshToken);
 
-    // Не возвращаем пароль
     const { password: _, ...userWithoutPassword } = user;
     
     res.json({ 
       accessToken,
+      refreshToken,
       user: userWithoutPassword 
     });
   } catch (error) {
@@ -204,9 +237,82 @@ router.post("/login", async (req, res) => {
 
 /**
  * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Обновление пары токенов по refresh-токену
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     responses:
+ *       200:
+ *         description: Новая пара токенов
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RefreshResponse'
+ *       400:
+ *         description: Refresh token обязателен
+ *       401:
+ *         description: Невалидный или истекший refresh token
+ */
+router.post("/refresh", (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ error: "refreshToken обязателен" });
+  }
+
+  // Проверяем, есть ли токен в хранилище
+  if (!refreshTokens.has(refreshToken)) {
+    return res.status(401).json({ error: "Невалидный refresh token" });
+  }
+
+  try {
+    // Проверяем подпись и срок действия
+    const payload = jwt.verify(refreshToken, REFRESH_SECRET);
+    
+    // Находим пользователя
+    const user = users.find(u => u.id === payload.sub);
+    if (!user) {
+      return res.status(401).json({ error: "Пользователь не найден" });
+    }
+
+    // Ротация: удаляем старый refresh-токен
+    refreshTokens.delete(refreshToken);
+
+    // Генерируем новую пару токенов
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+    
+    // Сохраняем новый refresh-токен
+    refreshTokens.add(newRefreshToken);
+
+    res.json({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (err) {
+    // Если токен истек или невалиден - удаляем его из хранилища
+    refreshTokens.delete(refreshToken);
+    return res.status(401).json({ error: "Невалидный или истекший refresh token" });
+  }
+});
+
+/**
+ * @swagger
  * /api/auth/me:
  *   get:
- *     summary: Получить информацию о текущем пользователе (защищённый маршрут)
+ *     summary: Получить информацию о текущем пользователе
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
@@ -232,7 +338,7 @@ router.post("/login", async (req, res) => {
  *         description: Пользователь не найден
  */
 router.get("/me", require("../middleware/auth"), (req, res) => {
-  // req.user заполняется в middleware
+  // req.user заполняется в middleware (использует ACCESS_SECRET)
   const userId = req.user.sub;
   const user = users.find(u => u.id === userId);
   
