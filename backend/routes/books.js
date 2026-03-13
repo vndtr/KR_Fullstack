@@ -6,6 +6,13 @@ const path = require("path");
 const booksPath = path.join(__dirname, "../data/books.js");
 let books = require(booksPath);
 
+// Вспомогательная функция для поиска книги по ID
+function findById(id) {
+  const num = Number(id);
+  if (isNaN(num)) return null;
+  return books.find(b => b.id === num);
+}
+
 /**
  * @swagger
  * /api/books:

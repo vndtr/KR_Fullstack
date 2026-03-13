@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const logger = require("./middleware/logger");
 const booksRouter = require("./routes/books");
-
+const authRouter = require("./routes/auth");
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -89,7 +89,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/books", booksRouter);
 
+app.use("/api/auth", authRouter);
 // Запуск сервера
 app.listen(PORT, () => {
-  console.log(`📚 Книжный магазин API запущен: http://localhost:${PORT}`);
+  console.log(` Книжный магазин API запущен: http://localhost:${PORT}`);
 });

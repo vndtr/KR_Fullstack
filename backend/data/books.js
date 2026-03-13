@@ -30,19 +30,19 @@ module.exports = [
     description: "Культовый роман-антиутопия о тоталитарном обществе, где за каждым следит Большой Брат.",
     price: 750,
     stock: 12,
-    rating: 4.9,
-    image: "/images/1984.jpg"
+    rating: 4.5,
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 4,
-    title: "Мастер и Маргарита",
-    author: "Михаил Булгаков",
+    title: "Посторонний",
+    author: "Альбер Камю",
     category: "роман",
     description: "Мистический роман о дьяволе, который посещает Москву 1930-х годов.",
     price: 890,
     stock: 5,
     rating: 4.9,
-    image: "/images/master.jpg"
+    image: "/images/Посторонний.jpg"
   },
   {
     id: 5,
@@ -53,7 +53,7 @@ module.exports = [
     price: 720,
     stock: 7,
     rating: 4.8,
-    image: "/images/crime.jpg"
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 6,
@@ -64,7 +64,7 @@ module.exports = [
     price: 650,
     stock: 20,
     rating: 4.9,
-    image: "/images/prince.jpg"
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 7,
@@ -75,7 +75,7 @@ module.exports = [
     price: 780,
     stock: 6,
     rating: 4.8,
-    image: "/images/comrades.jpg"
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 8,
@@ -86,7 +86,7 @@ module.exports = [
     price: 690,
     stock: 9,
     rating: 4.8,
-    image: "/images/mockingbird.jpg"
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 9,
@@ -97,7 +97,7 @@ module.exports = [
     price: 950,
     stock: 4,
     rating: 4.9,
-    image: "/images/solitude.jpg"
+    image: "/images/Кафка на пляже.jpeg"
   },
   {
     id: 10,
@@ -107,7 +107,7 @@ module.exports = [
     description: "Роман-эпопея о жизни русского общества в эпоху наполеоновских войн.",
     price: 1200,
     stock: 3,
-    rating: 4.8,
-    image: "/images/warandpeace.jpg"
+    rating: 4,
+    image: "/images/Кафка на пляже.jpeg"
   }
 ];
