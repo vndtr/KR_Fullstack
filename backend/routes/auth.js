@@ -3,10 +3,15 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcrypt");
 const { nanoid } = require("nanoid");
+const jwt = require("jsonwebtoken");
 
 let users = require("../data/users");
 
-// Функция для поиска пользователя по email
+// Секретный ключ (должен совпадать с тем, что в middleware)
+const JWT_SECRET = "bookstore_secret_key_2026";
+const ACCESS_EXPIRES_IN = "15m"; // токен живет 15 минут
+
+// Вспомогательная функция для поиска пользователя по email
 function findUserByEmail(email) {
   return users.find(u => u.email === email);
 }
@@ -25,19 +30,30 @@ function findUserByEmail(email) {
  *       properties:
  *         id:
  *           type: string
- *           description: Уникальный ID пользователя
  *         email:
  *           type: string
- *           description: Email (логин)
  *         firstName:
  *           type: string
- *           description: Имя
  *         lastName:
  *           type: string
- *           description: Фамилия
  *         password:
  *           type: string
- *           description: Хешированный пароль
+ *     LoginResponse:
+ *       type: object
+ *       properties:
+ *         accessToken:
+ *           type: string
+ *         user:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: string
+ *             email:
+ *               type: string
+ *             firstName:
+ *               type: string
+ *             lastName:
+ *               type: string
  */
 
 /**
@@ -60,12 +76,16 @@ function findUserByEmail(email) {
  *             properties:
  *               email:
  *                 type: string
+ *                 example: @mail.ru
  *               firstName:
  *                 type: string
+ *                 example: Анна
  *               lastName:
  *                 type: string
+ *                 example: string
  *               password:
  *                 type: string
+ *                 example: string
  *     responses:
  *       201:
  *         description: Пользователь создан
@@ -75,18 +95,15 @@ function findUserByEmail(email) {
 router.post("/register", async (req, res) => {
   const { email, firstName, lastName, password } = req.body;
 
-  // Валидация
   if (!email || !firstName || !lastName || !password) {
     return res.status(400).json({ error: "Все поля обязательны" });
   }
 
-  // Проверка, существует ли уже такой email
   if (findUserByEmail(email)) {
     return res.status(400).json({ error: "Пользователь с таким email уже существует" });
   }
 
   try {
-    // Хешируем пароль (10 раундов соли)
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = {
@@ -99,7 +116,6 @@ router.post("/register", async (req, res) => {
 
     users.push(newUser);
     
-    // Не возвращаем пароль в ответе
     const { password: _, ...userWithoutPassword } = newUser;
     res.status(201).json(userWithoutPassword);
   } catch (error) {
@@ -112,7 +128,7 @@ router.post("/register", async (req, res) => {
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Вход в систему
+ *     summary: Вход в систему, получение JWT-токена
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -126,20 +142,17 @@ router.post("/register", async (req, res) => {
  *             properties:
  *               email:
  *                 type: string
+ *                 example: @mail.ru
  *               password:
  *                 type: string
+ *                 example: string
  *     responses:
  *       200:
- *         description: Успешный вход
+ *         description: Успешный вход, возвращает токен
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 user:
- *                   type: object
+ *               $ref: '#/components/schemas/LoginResponse'
  *       401:
  *         description: Неверные учетные данные
  *       404:
@@ -164,13 +177,71 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Неверный пароль" });
     }
 
+    // Создаем JWT-токен
+    const accessToken = jwt.sign(
+      { 
+        sub: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
+      JWT_SECRET,
+      { expiresIn: ACCESS_EXPIRES_IN }
+    );
+
     // Не возвращаем пароль
     const { password: _, ...userWithoutPassword } = user;
-    res.json({ success: true, user: userWithoutPassword });
+    
+    res.json({ 
+      accessToken,
+      user: userWithoutPassword 
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Ошибка сервера" });
   }
+});
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Получить информацию о текущем пользователе (защищённый маршрут)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Данные текущего пользователя
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 firstName:
+ *                   type: string
+ *                 lastName:
+ *                   type: string
+ *       401:
+ *         description: Не авторизован
+ *       404:
+ *         description: Пользователь не найден
+ */
+router.get("/me", require("../middleware/auth"), (req, res) => {
+  // req.user заполняется в middleware
+  const userId = req.user.sub;
+  const user = users.find(u => u.id === userId);
+  
+  if (!user) {
+    return res.status(404).json({ error: "Пользователь не найден" });
+  }
+
+  const { password: _, ...userWithoutPassword } = user;
+  res.json(userWithoutPassword);
 });
 
 module.exports = router;
